@@ -13,6 +13,7 @@ dependencies = [
     "langgraph>=1.2.0",
     "litellm>=1.85.0",
     "openai>=2.37.0",
+    "pytest>=9.0.3",
     "python-dotenv>=1.2.2",
     "streamlit>=1.57.0",
 ]
