@@ -1,4 +1,4 @@
-from config import *
+from config/settings import *
 
 openai_llm = ChatOpenAI(
     model="gpt-4o-mini",
