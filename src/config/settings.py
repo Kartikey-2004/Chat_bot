@@ -14,4 +14,8 @@ class Settings:
 
     TEMPERATURE = 0.2
 
+    # Relative paths from project root; agent-created files are stored here.
+    AGENT_FILES_DIR = os.getenv("AGENT_FILES_DIR", "agent_output")
+
+
 settings = Settings()

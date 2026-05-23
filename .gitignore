@@ -29,3 +29,6 @@ build/
 
 # Logs
 *.log
+
+# Agent-created files
+agent_output/
