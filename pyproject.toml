@@ -1,7 +1,7 @@
 [project]
-name = "Chat_bot"
+name = "multi-llm-chatbot"
 version = "0.1.0"
-description = "Add your description here"
+description = "Multi-provider AI chatbot with LiteLLM, LangChain agents, and Streamlit UI"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

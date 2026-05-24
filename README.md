@@ -70,7 +70,7 @@ flowchart LR
 
 ```bash
 git clone <your-repo-url>
-cd Chat_bot
+cd multi-llm-chatbot
 ```
 
 ### 2. Install dependencies
@@ -143,7 +143,7 @@ Leave `LANGSMITH_API_KEY` empty to disable tracing.
 
 ## Run
 
-All commands assume you are in the **project root** (`Chat_bot/`).
+All commands assume you are in the **project root** (`multi-llm-chatbot/`).
 
 ### Web UI (Streamlit)
 
@@ -218,7 +218,7 @@ Use **Clear chat** in the sidebar to reset messages and the file list.
 ## Project structure
 
 ```
-Chat_bot/
+multi-llm-chatbot/
 ├── .env.example          # Environment template (copy to .env)
 ├── .python-version       # Python version (3.13)
 ├── pyproject.toml        # Project metadata and dependencies
@@ -264,6 +264,11 @@ Chat_bot/
 
 - Run Streamlit from the **project root**: `streamlit run src/app.py`
 - For `main.py`, run from `src/` or set `PYTHONPATH=src`.
+
+### `uv run streamlit` fails after moving or renaming the project folder
+
+- Console scripts in `.venv/bin/` embed the old absolute path in their shebang.
+- Fix: remove the virtualenv and reinstall: `rm -rf .venv && uv sync`
 
 ### LiteLLM warnings about `botocore`
 

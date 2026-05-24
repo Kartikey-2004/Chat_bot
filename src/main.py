@@ -77,11 +77,13 @@ def main() -> None:
         if query.lower().startswith("/openai"):
             provider = "openai"
             query = query[7:].strip()
-            continue
-        if query.lower().startswith("/gemini"):
+            if not query:
+                continue
+        elif query.lower().startswith("/gemini"):
             provider = "gemini"
             query = query[7:].strip()
-            continue
+            if not query:
+                continue
 
         reply, files = run_assistant(
             query, provider=provider, show_tools=True, history=history
