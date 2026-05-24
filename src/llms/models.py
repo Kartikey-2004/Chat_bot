@@ -1,38 +1,61 @@
 import os
+import re
+from dataclasses import dataclass
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
+from langchain_litellm import ChatLiteLLM
 
 from config.settings import settings
 
-MODELS = {
-    "openai": settings.OPENAI_MODEL,
-    "gemini": settings.GEMINI_MODEL,
-}
-
-openai_llm = ChatOpenAI(
-    model=settings.OPENAI_MODEL,
-    temperature=settings.TEMPERATURE,
-    api_key=settings.OPENAI_API_KEY,
-)
-
-gemini_llm = ChatGoogleGenerativeAI(
-    model=settings.GEMINI_MODEL,
-    temperature=settings.TEMPERATURE,
-    google_api_key=settings.GEMINI_API_KEY,
-)
-
-_PROVIDERS = {
-    "openai": openai_llm,
-    "gemini": gemini_llm,
-}
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_llm_cache: dict[str, ChatLiteLLM] = {}
 
 
-def get_llm(provider: str | None = None):
+def configured_providers() -> list[str]:
+    providers = []
+    if settings.OPENAI_API_KEY:
+        providers.append("openai")
+    if settings.GEMINI_API_KEY:
+        providers.append("gemini")
+    return providers
+
+
+def provider_label(name: str) -> str:
+    model = settings.OPENAI_MODEL if name == "openai" else settings.GEMINI_MODEL
+    return f"{name.title()} · {model}"
+
+
+def _litellm_model(name: str) -> str:
+    if name == "openai":
+        return f"openai/{settings.OPENAI_MODEL}"
+    return f"gemini/{settings.GEMINI_MODEL}"
+
+
+def get_llm(provider: str | None = None) -> ChatLiteLLM:
     name = (provider or os.getenv("LLM_PROVIDER", "openai")).lower()
-    try:
-        return _PROVIDERS[name]
-    except KeyError as exc:
-        raise ValueError(
-            f"Unknown LLM provider: {name!r}. Use one of: {', '.join(_PROVIDERS)}"
-        ) from exc
+    if name not in ("openai", "gemini"):
+        raise ValueError(f"Unknown provider: {name!r}")
+
+    if name == "openai" and not settings.OPENAI_API_KEY:
+        raise ValueError("OPENAI_API_KEY is missing in .env")
+    if name == "gemini" and not settings.GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY is missing in .env")
+
+    if name in _llm_cache:
+        return _llm_cache[name]
+
+    if settings.OPENAI_API_KEY:
+        os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
+    if settings.GEMINI_API_KEY:
+        os.environ["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
+        os.environ["GOOGLE_API_KEY"] = settings.GEMINI_API_KEY
+
+    llm = ChatLiteLLM(model=_litellm_model(name), temperature=settings.TEMPERATURE)
+    _llm_cache[name] = llm
+    return llm
+
+
+def format_llm_error(exc: Exception) -> str:
+    message = str(exc)
+    if "429" in message or "RESOURCE_EXHAUSTED" in message.upper():
+        return "Rate limit exceeded."
+    return f"Request failed: {message[:400]}"

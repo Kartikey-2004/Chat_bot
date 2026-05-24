@@ -1,161 +1,98 @@
+import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from langchain.agents import create_agent
-from langchain_openai import ChatOpenAI
 from langchain_core.callbacks.base import BaseCallbackHandler
 
-# =========================
-# Tools
-# =========================
-from tools.search_tool import web_search
-from tools.calculator_tool import calculator
-
-from tools.file_tool import (
-    read_file,
-    write_file,
-    append_file,
-    list_files,
-)
-
-from tools.shell_tool import run_shell_command
+from agents.assistant import get_agent
+from config.settings import settings
+from guardrails import check_input, check_output
+from llms.models import format_llm_error
+from tools.file_tool import new_files_since, snapshot_files
 
 
-# =========================================
-# Callback Handler
-# =========================================
 class ToolCallbackHandler(BaseCallbackHandler):
-
     def on_tool_start(self, serialized, input_str, **kwargs):
-        print("\n========== TOOL USED ==========")
-        print(f"Tool Name  : {serialized.get('name')}")
-        print(f"Tool Input : {input_str}")
+        print(f"\n[tool] {serialized.get('name')}: {input_str}")
 
     def on_tool_end(self, output, **kwargs):
-        print(f"Tool Output: {output}")
-        print("================================\n")
-
-    def on_tool_error(self, error, **kwargs):
-        print("\n========== TOOL ERROR ==========")
-        print(f"Error: {str(error)}")
-        print("================================\n")
+        print(f"[tool] -> {output}\n")
 
 
-# =========================================
-# LLM
-# =========================================
-llm = ChatOpenAI(
-    model="gpt-4o-mini",
-    temperature=0,
-)
+def run_assistant(
+    user_input: str,
+    *,
+    provider: str | None = None,
+    show_tools: bool = False,
+    history: list[dict] | None = None,
+) -> tuple[str, list]:
+    check = check_input(user_input)
+    if not check.allowed:
+        return check.message, []
 
+    resolved = (provider or os.getenv("LLM_PROVIDER", "openai")).lower()
+    before = snapshot_files()
 
-# =========================================
-# Agent
-# =========================================
-agent = create_agent(
-    model=llm,
-    tools=[
-        # Search + Math
-        web_search,
-        calculator,
-        # File Tools
-        read_file,
-        write_file,
-        append_file,
-        list_files,
-        # Shell Tool
-        run_shell_command,
-    ],
-    system_prompt="""
-You are a professional AI assistant.
-
-You have access to multiple tools.
-
-Available Tools:
-------------------------------------------------
-
-1. calculator
-- Perform mathematical calculations
-
-2. web_search
-- Search the internet for recent information
-
-3. read_file
-- Read file contents
-
-4. write_file
-- Create or overwrite files
-
-5. append_file
-- Append content to existing files
-
-6. list_files
-- List files/folders in a directory
-
-7. run_shell_command
-- Execute terminal/shell commands
-
-Rules:
-------------------------------------------------
-- Use tools whenever required.
-- Always choose the correct tool.
-- Never hallucinate file contents.
-- Never pretend shell commands executed if they did not.
-- Keep answers concise and accurate.
-- For coding tasks:
-    - inspect files first
-    - modify carefully
-    - avoid unnecessary overwrites
-""",
-)
-
-
-# =========================================
-# Chat Loop
-# =========================================
-print("\n===================================")
-print("        AI Assistant Started")
-print("===================================")
-print("Type 'exit' or 'quit' to stop.\n")
-
-while True:
-
-    user_query = input("You: ").strip()
-
-    if not user_query:
-        continue
-
-    if user_query.lower() in ["exit", "quit"]:
-        print("\nSession Ended.")
-        break
+    messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in (history or [])
+        if m.get("role") in ("user", "assistant") and m.get("content")
+    ]
+    messages.append({"role": "user", "content": user_input})
+    if len(messages) > settings.MAX_HISTORY_MESSAGES:
+        messages = messages[-settings.MAX_HISTORY_MESSAGES :]
 
     try:
-
-        response = agent.invoke(
-            {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": user_query,
-                    }
-                ]
-            },
-            config={"callbacks": [ToolCallbackHandler()]},
+        response = get_agent(resolved).invoke(
+            {"messages": messages},
+            config={"callbacks": [ToolCallbackHandler()]} if show_tools else None,
         )
+    except ValueError as exc:
+        return str(exc), []
+    except Exception as exc:
+        return format_llm_error(exc), []
 
-        ai_message = response["messages"][-1].content
+    content = getattr(response["messages"][-1], "content", "")
+    check = check_output(content)
+    if not check.allowed:
+        return check.message, []
 
-        print("\nAI:")
-        print(ai_message)
+    return check.message, new_files_since(before, snapshot_files())
+
+
+def main() -> None:
+    print("AI Assistant — type 'quit' to exit, /openai or /gemini to switch\n")
+    provider = None
+    history: list[dict] = []
+
+    while True:
+        try:
+            query = input("You: ").strip()
+        except KeyboardInterrupt:
+            break
+        if not query or query.lower() in ("exit", "quit"):
+            break
+        if query.lower().startswith("/openai"):
+            provider = "openai"
+            query = query[7:].strip()
+            continue
+        if query.lower().startswith("/gemini"):
+            provider = "gemini"
+            query = query[7:].strip()
+            continue
+
+        reply, files = run_assistant(
+            query, provider=provider, show_tools=True, history=history
+        )
+        history.append({"role": "user", "content": query})
+        history.append({"role": "assistant", "content": reply})
+        print(f"\nAI: {reply}")
+        for path in files:
+            print(f"  file: {path.name}")
         print()
 
-    except KeyboardInterrupt:
-        print("\n\nInterrupted by user.")
-        break
 
-    except Exception as e:
-        print("\n========== ERROR ==========")
-        print(str(e))
-        print("===========================\n")
+if __name__ == "__main__":
+    main()

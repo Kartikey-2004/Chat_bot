@@ -5,121 +5,93 @@ from langchain.tools import tool
 
 from config.settings import settings
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _agent_files_dir() -> Path:
+def agent_output_dir() -> Path:
     path = Path(settings.AGENT_FILES_DIR)
     if not path.is_absolute():
-        path = _PROJECT_ROOT / path
+        path = _ROOT / path
+    path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def _ensure_agent_files_dir() -> Path:
-    directory = _agent_files_dir()
-    directory.mkdir(parents=True, exist_ok=True)
-    return directory
+def snapshot_files() -> dict[str, float]:
+    root = agent_output_dir()
+    return {
+        str(f.relative_to(root)): f.stat().st_mtime
+        for f in root.rglob("*")
+        if f.is_file()
+    }
 
 
-def _resolve_write_path(file_path: str) -> Path:
-    """Relative paths are stored under the agent output directory."""
+def new_files_since(before: dict[str, float], after: dict[str, float]) -> list[Path]:
+    root = agent_output_dir()
+    return [
+        root / rel
+        for rel, mtime in after.items()
+        if rel not in before or before[rel] < mtime
+    ]
+
+
+def _write_path(file_path: str) -> Path:
     path = Path(file_path)
-    if path.is_absolute():
-        return path
-    return _ensure_agent_files_dir() / path
+    return path if path.is_absolute() else agent_output_dir() / path
 
 
-def _resolve_read_path(file_path: str) -> Path:
+def _read_path(file_path: str) -> Path:
     path = Path(file_path)
     if path.exists():
         return path
-    agent_path = _agent_files_dir() / path
-    if agent_path.exists():
-        return agent_path
-    return path
-
-
-def _resolve_list_dir(directory: str) -> Path:
-    if directory in (".", ""):
-        return _ensure_agent_files_dir()
-    path = Path(directory)
-    if path.is_absolute():
-        return path
-    return _ensure_agent_files_dir() / path
+    agent_path = agent_output_dir() / path
+    return agent_path if agent_path.exists() else path
 
 
 @tool
 def read_file(file_path: str) -> str:
-    """
-    Read content from a file.
-    Relative paths are looked up in the agent output folder first, then the project.
-    """
-
-    path = _resolve_read_path(file_path)
-
+    """Read a file. Relative paths use the agent output folder."""
+    path = _read_path(file_path)
     if not path.exists():
         return f"Error: File '{file_path}' not found."
-
     try:
         return path.read_text(encoding="utf-8")
-
     except Exception as e:
-        return f"Error reading file: {str(e)}"
+        return f"Error reading file: {e}"
 
 
 @tool
 def write_file(file_path: str, content: str) -> str:
-    """
-    Write content to a file.
-    Relative paths are saved under the agent output folder (see AGENT_FILES_DIR).
-    Automatically creates folders if they do not exist.
-    """
-
-    path = _resolve_write_path(file_path)
-
+    """Write a file. Relative paths save under the agent output folder."""
+    path = _write_path(file_path)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-
         path.write_text(content, encoding="utf-8")
-
-        return f"File written successfully: {path}"
-
+        return f"File written: {path.name}"
     except Exception as e:
-        return f"Error writing file: {str(e)}"
+        return f"Error writing file: {e}"
 
 
 @tool
 def append_file(file_path: str, content: str) -> str:
-    """
-    Append content to an existing file.
-    Relative paths use the agent output folder (see AGENT_FILES_DIR).
-    Automatically creates folders if needed.
-    """
-
-    path = _resolve_write_path(file_path)
-
+    """Append to a file. Relative paths use the agent output folder."""
+    path = _write_path(file_path)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-
         with open(path, "a", encoding="utf-8") as f:
             f.write(content)
-
-        return f"Content appended successfully: {path}"
-
+        return f"Content appended: {path.name}"
     except Exception as e:
-        return f"Error appending file: {str(e)}"
+        return f"Error appending file: {e}"
 
 
 @tool
 def list_files(directory: str = ".") -> List[str]:
-    """
-    List all files in a directory.
-    Default lists the agent output folder where created files are stored.
-    """
-
-    path = _resolve_list_dir(directory)
-
+    """List files in a directory. Default is the agent output folder."""
+    if directory in (".", ""):
+        path = agent_output_dir()
+    else:
+        p = Path(directory)
+        path = p if p.is_absolute() else agent_output_dir() / p
     if not path.exists():
         return [f"Error: Directory '{directory}' not found."]
-
-    return [str(file) for file in path.iterdir()]
+    return [f.name for f in path.iterdir()]
