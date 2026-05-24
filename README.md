@@ -16,17 +16,17 @@ A Python chatbot with a **Streamlit web UI** and a **terminal CLI**. Switch betw
 
 ```mermaid
 flowchart LR
-  subgraph frontend [Frontend]
-    UI[Streamlit app.py]
-    CLI[Terminal main.py]
+  subgraph frontend ["Frontend"]
+    UI["Streamlit app.py"]
+    CLI["Terminal main.py"]
   end
 
-  subgraph backend [Backend]
-    ORCH[main.py orchestration]
-    AGENT[agents/assistant.py]
-    LLM[llms/models.py LiteLLM]
-    TOOLS[tools/]
-    GUARD[guardrails.py]
+  subgraph backend ["Backend"]
+    ORCH["main.py orchestration"]
+    AGENT["agents/assistant.py"]
+    LLM["llms/models.py"]
+    TOOLS["tools/"]
+    GUARD["guardrails.py"]
   end
 
   UI --> ORCH
@@ -38,7 +38,7 @@ flowchart LR
 ```
 
 | Layer | Role |
-|-------|------|
+| ------- | ------ |
 | `src/app.py` | Streamlit chat UI (frontend) |
 | `src/main.py` | Request handling, history, guardrails (orchestration) |
 | `src/agents/assistant.py` | LangChain agent + system prompt + tools |
@@ -69,7 +69,7 @@ flowchart LR
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Kartikey-2004/multi-llm-chatbot.git
 cd multi-llm-chatbot
 ```
 
@@ -126,7 +126,7 @@ Leave `LANGSMITH_API_KEY` empty to disable tracing.
 ## Environment variables
 
 | Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
+| ---------- | ---------- | --------- | ------------- |
 | `OPENAI_API_KEY` | No* | — | OpenAI API key |
 | `GEMINI_API_KEY` | No* | — | Google Gemini key (also accepts `GOOGLE_API_KEY`) |
 | `LLM_PROVIDER` | No | `openai` | Default provider: `openai` or `gemini` |
@@ -151,7 +151,7 @@ All commands assume you are in the **project root** (`multi-llm-chatbot/`).
 uv run streamlit run src/app.py
 ```
 
-Then open the URL shown in the terminal (usually **http://localhost:8501**).
+Then open the URL shown in the terminal (usually **[localhost:8501](http://localhost:8501)**).
 
 **With pip/venv activated:**
 
@@ -177,7 +177,7 @@ uv run python src/main.py
 **CLI commands:**
 
 | Input | Action |
-|-------|--------|
+| ------- | -------- |
 | `quit` or `exit` | Exit the program |
 | `/openai <message>` | Switch to OpenAI for the next message |
 | `/gemini <message>` | Switch to Gemini for the next message |
@@ -203,7 +203,7 @@ Prefix a message with `/openai` or `/gemini`, or set `LLM_PROVIDER` in `.env` fo
 The assistant may automatically use:
 
 | Tool | Purpose |
-|------|---------|
+| ------ | --------- |
 | `calculator` | Math expressions |
 | `web_search` | DuckDuckGo web search |
 | `read_file` / `write_file` / `append_file` / `list_files` | File operations under `AGENT_FILES_DIR` |
@@ -217,7 +217,7 @@ Use **Clear chat** in the sidebar to reset messages and the file list.
 
 ## Project structure
 
-```
+```text
 multi-llm-chatbot/
 ├── .env.example          # Environment template (copy to .env)
 ├── .python-version       # Python version (3.13)
@@ -269,6 +269,11 @@ multi-llm-chatbot/
 
 - Console scripts in `.venv/bin/` embed the old absolute path in their shebang.
 - Fix: remove the virtualenv and reinstall: `rm -rf .venv && uv sync`
+
+### `VIRTUAL_ENV=.../Chat_bot/.venv` warning from `uv run`
+
+- Your shell still has the old project’s venv activated.
+- Run `deactivate`, then `source .venv/bin/activate` inside `multi-llm-chatbot`, or open a fresh terminal in this folder.
 
 ### LiteLLM warnings about `botocore`
 

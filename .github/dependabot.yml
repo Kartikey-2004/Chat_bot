@@ -1,0 +1,9 @@
+# Keep dependencies up to date; enables Security tab alerts for known CVEs.
+# https://docs.github.com/en/code-security/dependabot
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
