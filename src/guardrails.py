@@ -1,6 +1,9 @@
 import re
 from dataclasses import dataclass
 
+# Match rm -rf with any target; \b after / fails at end-of-string.
+_UNSAFE_SHELL = re.compile(r"\bformat\s+c:|rm\s+-rf\b", re.I)
+
 
 @dataclass(frozen=True)
 class GuardrailResult:
@@ -20,7 +23,7 @@ def check_input(text: str) -> GuardrailResult:
         for x in ("child sexual", "terrorist attack plan", "suicide method")
     ):
         return GuardrailResult(False, "I can't help with that request.")
-    if re.search(r"\b(rm\s+-rf\s+/|format\s+c:)\b", cleaned, re.I):
+    if _UNSAFE_SHELL.search(cleaned):
         return GuardrailResult(False, "That request looks unsafe.")
     return GuardrailResult(True)
 

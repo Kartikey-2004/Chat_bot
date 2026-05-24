@@ -1,12 +1,9 @@
 import os
-import re
-from dataclasses import dataclass
 
 from langchain_litellm import ChatLiteLLM
 
 from config.settings import settings
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _llm_cache: dict[str, ChatLiteLLM] = {}
 
 

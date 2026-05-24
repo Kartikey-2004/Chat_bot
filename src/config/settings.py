@@ -1,7 +1,23 @@
-from dotenv import load_dotenv
+import logging
 import os
 
+from dotenv import load_dotenv
+
 load_dotenv()
+
+
+def _configure_langsmith_tracing() -> None:
+    key = os.getenv("LANGSMITH_API_KEY", "").strip()
+    enabled = os.getenv("LANGSMITH_TRACING", "false").lower() in ("1", "true", "yes")
+    tracing = bool(key) and enabled
+    value = "true" if tracing else "false"
+    os.environ["LANGCHAIN_TRACING_V2"] = value
+    os.environ["LANGSMITH_TRACING"] = value
+    for name in ("langsmith", "langsmith.client"):
+        logging.getLogger(name).setLevel(logging.ERROR)
+
+
+_configure_langsmith_tracing()
 
 
 class Settings:
