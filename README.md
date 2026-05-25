@@ -277,7 +277,12 @@ multi-llm-chatbot/
 
 ### LiteLLM warnings about `botocore`
 
-- Harmless if you are not using AWS Bedrock. You can ignore them.
+- Harmless if you are not using AWS Bedrock. The app sets LiteLLM log level to `ERROR` so these do not clutter the CLI.
+
+### Pydantic serializer warnings (`reasoning` in metadata)
+
+- Harmless compatibility noise between LangChain, LiteLLM, and Pydantic v2 when responses include `reasoning` metadata (common with OpenAI/Gemini via LiteLLM).
+- Suppressed in `src/config/settings.py` so terminal and Streamlit output stay clean.
 
 ### Shell tool blocked a command
 

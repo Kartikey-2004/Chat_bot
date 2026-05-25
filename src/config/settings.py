@@ -1,9 +1,21 @@
 import logging
 import os
+import warnings
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _configure_runtime_noise() -> None:
+    # LangChain + LiteLLM attach `reasoning` metadata that Pydantic v2 flags when
+    # serializing (e.g. for LangSmith). Harmless; suppress so the CLI stays readable.
+    warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.main")
+    for name in ("LiteLLM", "litellm"):
+        logging.getLogger(name).setLevel(logging.ERROR)
+
+
+_configure_runtime_noise()
 
 
 def _configure_langsmith_tracing() -> None:
