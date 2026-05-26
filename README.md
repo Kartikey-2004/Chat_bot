@@ -1,6 +1,6 @@
 # Multi-LLM Chatbot
 
-A Python chatbot with a **Streamlit web UI** and a **terminal CLI**. Switch between LLM providers (OpenAI, Google Gemini) through a single [LiteLLM](https://docs.litellm.ai/) integration. The assistant can use tools for math, web search, file I/O, and safe shell commands.
+A Python chatbot with a **Streamlit web UI** and a **terminal CLI**. Switch between LLM providers (OpenAI, Google Gemini) through a single [LiteLLM](https://docs.litellm.ai/) integration. The assistant can use tools for math, web search, file I/O, and safe shell commands. The web UI can run locally with [uv](https://docs.astral.sh/uv/) or in a **Docker** container.
 
 ## Features
 
@@ -11,6 +11,7 @@ A Python chatbot with a **Streamlit web UI** and a **terminal CLI**. Switch betw
 - **Guardrails** — basic input/output checks (length, unsafe patterns, blocked topics)
 - **Chat history** — conversation context kept per session (configurable limit)
 - **Optional LangSmith tracing** — observability for agent runs when configured
+- **Docker** — production-style image for the Streamlit app (Python 3.13, health check on port 8501)
 
 ## Architecture
 
@@ -54,6 +55,7 @@ flowchart LR
 - [LangChain](https://python.langchain.com/) — agent framework
 - [LiteLLM](https://docs.litellm.ai/) — unified LLM API (via `langchain-litellm`)
 - [python-dotenv](https://github.com/theskumar/python-dotenv) — environment configuration
+- [Docker](https://docs.docker.com/) — optional containerized deployment of the web UI
 
 ## Prerequisites
 
@@ -63,6 +65,8 @@ flowchart LR
    - [OpenAI API key](https://platform.openai.com/api-keys)
    - [Google AI Studio / Gemini API key](https://aistudio.google.com/apikey)
 4. **Optional:** [LangSmith](https://smith.langchain.com/) API key for tracing
+
+For **Docker** only, you need [Docker Engine](https://docs.docker.com/engine/install/) (or Docker Desktop) instead of a local Python/uv install. API keys are still required and are passed at container runtime (see [Run with Docker](#run-with-docker)).
 
 ## Setup
 
@@ -185,6 +189,59 @@ uv run python src/main.py
 
 Tool activity is printed to the terminal when using the CLI.
 
+### Run with Docker
+
+The `Dockerfile` builds an image that runs **only the Streamlit web UI** (not the terminal CLI). It uses Python 3.13, installs dependencies with `uv sync --frozen`, exposes port **8501**, and includes a Streamlit health check.
+
+**1. Configure environment variables** (same as local setup):
+
+```bash
+cp .env.example .env
+# Edit .env with at least one API key
+```
+
+**2. Build the image** (from the project root):
+
+```bash
+docker build -t multi-llm-chatbot .
+```
+
+**3. Run the container:**
+
+```bash
+docker run --rm -p 8501:8501 --env-file .env multi-llm-chatbot
+```
+
+Open **[http://localhost:8501](http://localhost:8501)** in your browser.
+
+**Persist agent-created files** on the host (recommended if you use file tools):
+
+```bash
+docker run --rm -p 8501:8501 --env-file .env \
+  -v "$(pwd)/agent_output:/app/agent_output" \
+  multi-llm-chatbot
+```
+
+`AGENT_FILES_DIR` in `.env` should stay `agent_output` (the default) so paths match the mount inside the container (`/app/agent_output`).
+
+**Pass individual variables** instead of `--env-file` if you prefer:
+
+```bash
+docker run --rm -p 8501:8501 \
+  -e OPENAI_API_KEY=sk-... \
+  -e GEMINI_API_KEY=... \
+  multi-llm-chatbot
+```
+
+The image does not bundle `.env` (it is excluded via `.dockerignore`). Never bake API keys into the image.
+
+| Docker detail | Value |
+| ------------- | ----- |
+| Base image | `python:3.13-slim` |
+| App port | `8501` (`-p 8501:8501`) |
+| Bind address | `0.0.0.0` (reachable from the host) |
+| Health check | `GET http://127.0.0.1:8501/_stcore/health` every 30s |
+
 ## Usage
 
 ### Switching models (web)
@@ -219,8 +276,10 @@ Use **Clear chat** in the sidebar to reset messages and the file list.
 
 ```text
 multi-llm-chatbot/
+├── .dockerignore         # Files excluded from Docker build context
 ├── .env.example          # Environment template (copy to .env)
 ├── .python-version       # Python version (3.13)
+├── Dockerfile            # Streamlit web UI image
 ├── pyproject.toml        # Project metadata and dependencies
 ├── uv.lock               # Locked dependency versions
 ├── README.md
@@ -288,6 +347,20 @@ multi-llm-chatbot/
 
 - Commands like `rm -rf`, `shutdown`, and similar patterns are blocked by design in `shell_tool.py` and `guardrails.py`.
 
+### Docker: container exits or “Add API keys” in the UI
+
+- Pass keys with `--env-file .env` or `-e OPENAI_API_KEY=...` / `-e GEMINI_API_KEY=...`. The image does not include `.env`.
+- Confirm `.env` exists on the host before `docker run --env-file .env`.
+
+### Docker: cannot reach the app on localhost
+
+- Map the port: `-p 8501:8501`.
+- Wait for the health check start period (~15s) after first start.
+
+### Docker: agent files disappear after restart
+
+- Mount a volume: `-v "$(pwd)/agent_output:/app/agent_output"`.
+
 ## Development
 
 Reinstall after dependency changes:
@@ -297,6 +370,12 @@ uv sync
 ```
 
 Add a new LiteLLM-backed provider by extending `src/llms/models.py` and `configured_providers()` in the same file, then wire the UI in `src/app.py`.
+
+Rebuild the Docker image after dependency or source changes:
+
+```bash
+docker build -t multi-llm-chatbot .
+```
 
 ## License
 
