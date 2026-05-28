@@ -4,13 +4,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from langchain_core.callbacks.base import BaseCallbackHandler
-
 from agents.assistant import get_agent
 from config.settings import settings
 from guardrails import check_input, check_output
 from llms.models import format_llm_error
 from tools.file_tool import new_files_since, snapshot_files
+
+from langchain_core.callbacks.base import BaseCallbackHandler
 
 
 class ToolCallbackHandler(BaseCallbackHandler):
